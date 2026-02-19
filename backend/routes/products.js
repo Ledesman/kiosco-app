@@ -6,7 +6,7 @@ const { authenticateToken, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 // Crear un nuevo producto con imagen
-router.post('/', authenticateToken, isAdmin, upload.single('image'), async (req, res) => {
+router.post('/', authenticateToken, upload.single('image'), async (req, res) => {
     try {
         const { name, price, stock_quantity, category_id, barcode, min_stock_alert } = req.body;
         const image_url = req.file ? `/uploads/${req.file.filename}` : null;
@@ -212,7 +212,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 });
 // Actualizar un producto existente
 // Update product with PATCH
-router.patch('/:id', upload.single('image'), async (req, res) => {
+router.patch('/:id', authenticateToken, upload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
         let updateData = { ...req.body };

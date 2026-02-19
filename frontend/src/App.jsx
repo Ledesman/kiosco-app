@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import AdminRoute from './components/AdminRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
@@ -11,6 +12,7 @@ import Suppliers from './pages/Suppliers';
 import Reports from './pages/Reports';
 import Devoluciones from './pages/Devoluciones';
 import Users from './pages/Users';
+import Unauthorized from './pages/Unauthorized';
 
 const PrivateRoute = ({ children, useLayout = true }) => {
   const { user, loading } = useAuth();
@@ -28,6 +30,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/sales" element={<PrivateRoute><Sales /></PrivateRoute>} />
@@ -36,7 +39,7 @@ function App() {
           <Route path="/categories" element={<PrivateRoute><Categories /></PrivateRoute>} />
           <Route path="/expenses" element={<PrivateRoute><Expenses /></PrivateRoute>} />
           <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
-          <Route path="/devoluciones" element={<PrivateRoute><Devoluciones /></PrivateRoute>} />
+          <Route path="/devoluciones" element={<AdminRoute><Devoluciones /></AdminRoute>} />
           <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
 

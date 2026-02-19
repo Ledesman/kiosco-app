@@ -300,7 +300,7 @@ const Reports = () => {
             {
                 selectedSale && (
                     <div className="fixed inset-0 z-100 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <div className="bg-white rounded-[40px] shadow-2xl max-w-2xl w-full p-8 space-y-8 animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="bg-white rounded-[40px] shadow-2xl max-w-md w-full p-6 space-y-6 animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="flex justify-between items-start">
                                 <div className="space-y-1">
                                     <h2 className="text-2xl font-black text-gray-800 tracking-tight">Detalle de Venta</h2>

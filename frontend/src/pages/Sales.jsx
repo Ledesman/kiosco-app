@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CheckCircle2, DollarSign, CreditCard, Smartphone, ArrowRight, Receipt, ChevronRight, X } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CheckCircle2, DollarSign, CreditCard, Smartphone, ArrowRight, Receipt, ChevronRight, X, Edit } from 'lucide-react';
 import api from '../services/api';
 import Swal from 'sweetalert2';
 
@@ -17,6 +17,14 @@ const Sales = ({ isKiosk = false }) => {
     const [showTransferInfo, setShowTransferInfo] = useState(null); // 'bank' or 'mp'
     const [paymentNote, setPaymentNote] = useState('');
     const searchInputRef = useRef(null);
+    
+    // Estado para editar pagos de ventas existentes
+    const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+    const [searchTicket, setSearchTicket] = useState('');
+    const [currentEditSale, setCurrentEditSale] = useState(null);
+    const [editPaymentMethods, setEditPaymentMethods] = useState({ efectivo: 0, debito: 0, credito: 0, transferencia: 0, mercadopago: 0, mp_transferencia: 0 });
+    const [editPaymentNote, setEditPaymentNote] = useState('');
+    const [isLoadingSale, setIsLoadingSale] = useState(false);
 
     const BANK_DETAILS = {
         alias: "KIOSCO.VENTAS.2024",
@@ -240,6 +248,85 @@ const Sales = ({ isKiosk = false }) => {
         } finally { setIsProcessing(false); }
     };
 
+    // Load existing sale by ticket number for editing payment
+    const loadSaleForEdit = async (ticketNumber) => {
+        if (!ticketNumber.trim()) {
+            Swal.fire({ icon: 'warning', title: 'Ticket requerido', text: 'Ingresa el número de ticket' });
+            return;
+        }
+
+        setIsLoadingSale(true);
+        try {
+            const res = await api.get(`/sales/ticket/${ticketNumber}`);
+            const sale = res.data.sale;
+            
+            setCurrentEditSale(sale);
+            setEditPaymentMethods({
+                efectivo: parseFloat(sale.payment_method_efectivo) || 0,
+                debito: parseFloat(sale.payment_method_debito) || 0,
+                credito: parseFloat(sale.payment_method_credito) || 0,
+                transferencia: parseFloat(sale.payment_method_transferencia) || 0,
+                mercadopago: parseFloat(sale.payment_method_mercadopago) || 0,
+                mp_transferencia: parseFloat(sale.payment_method_mp_transferencia) || 0
+            });
+            setEditPaymentNote(sale.payment_note || '');
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.error || 'Ticket no encontrado' });
+            setCurrentEditSale(null);
+        } finally {
+            setIsLoadingSale(false);
+        }
+    };
+
+    // Update payment method for existing sale
+    const updateSalePayment = async () => {
+        if (!currentEditSale) return;
+
+        const total = parseFloat(currentEditSale.total_amount) || 0;
+        const payment_total = 
+            (parseFloat(editPaymentMethods.efectivo) || 0) +
+            (parseFloat(editPaymentMethods.debito) || 0) +
+            (parseFloat(editPaymentMethods.credito) || 0) +
+            (parseFloat(editPaymentMethods.transferencia) || 0) +
+            (parseFloat(editPaymentMethods.mercadopago) || 0) +
+            (parseFloat(editPaymentMethods.mp_transferencia) || 0);
+
+        if (Math.abs(payment_total - total) > 0.01) {
+            Swal.fire({ icon: 'warning', title: 'Monto inválido', text: `El total debe ser $${total.toFixed(2)}` });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            const res = await api.patch(`/sales/${currentEditSale.id}/payment`, {
+                payment_methods: editPaymentMethods,
+                payment_note: editPaymentNote,
+                reason: 'Cambio manual de método de pago'
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Pago Actualizado!',
+                text: `Ticket: ${currentEditSale.ticket_number}`,
+                showCancelButton: true,
+                confirmButtonText: 'Imprimir ticket',
+                cancelButtonText: 'Cerrar',
+                customClass: { popup: 'rounded-[32px]' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    printTicket({ ...res.data.sale, payment_methods: editPaymentMethods, payment_note: editPaymentNote });
+                }
+                setShowEditPaymentModal(false);
+                setCurrentEditSale(null);
+                setSearchTicket('');
+            });
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.error || 'No se pudo actualizar el pago' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     if (isKiosk) {
         return (
             <div className="fixed inset-0 bg-[#0f172a] text-white overflow-hidden flex flex-col font-sans">
@@ -366,20 +453,30 @@ const Sales = ({ isKiosk = false }) => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <button
+                             {/*    <button
                                     onClick={() => quickFinalize('efectivo')}
                                     disabled={cart.length === 0 || isProcessing}
                                     className="py-5 bg-[#0f172a] text-white rounded-[28px] font-black shadow-xl hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none uppercase tracking-widest"
                                 >
                                     Efectivo
-                                </button>
+                                </button> */}
                                 <button
+                                    onClick={() => {
+                                        const methods = { efectivo: total, debito: 0, credito: 0, transferencia: 0, mercadopago: 0, mp_transferencia: 0 };
+                                        finalizeSaleInternal(methods);
+                                    }}
+                                    disabled={cart.length === 0 || isProcessing}
+                                    className="py-6 bg-emerald-600 text-white rounded-[68px] font-black shadow-xl hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none uppercase tracking-widest col-span-2"
+                                >
+                                    Finalizar
+                                </button>
+                               {/*  <button
                                     onClick={() => setIsSplitPayment(true)}
                                     disabled={cart.length === 0 || isProcessing}
-                                    className="py-5 bg-blue-600 text-white rounded-[28px] font-black shadow-xl hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none uppercase tracking-widest"
+                                    className="py-5 bg-blue-600 text-white rounded-[28px] font-black shadow-xl hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none uppercase tracking-widest col-span-2"
                                 >
                                     Otros Pagos
-                                </button>
+                                </button>  */}
                             </div>
                         </div>
                     </div>
@@ -472,12 +569,20 @@ const Sales = ({ isKiosk = false }) => {
                     <h1 className="text-2xl font-black text-gray-800 tracking-tight">Ventas</h1>
                     <p className="text-sm text-gray-400 font-bold uppercase tracking-widest leading-none">POS OPERATIVO</p>
                 </div>
-                <button
-                    onClick={() => window.open('/pos', 'PosTerminal', 'width=1600,height=1000')}
-                    className="flex items-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-500/30"
-                >
-                    <Smartphone size={20} /> MODUE FULLSCREEN / KIOSCO
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowEditPaymentModal(true)}
+                        className="flex items-center gap-3 bg-amber-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-amber-700 active:scale-95 transition-all shadow-lg shadow-amber-500/30"
+                    >
+                        <Edit size={20} /> EDITAR PAGO
+                    </button>
+                    <button
+                        onClick={() => window.open('/pos', 'PosTerminal', 'width=1600,height=1000')}
+                        className="flex items-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-500/30"
+                    >
+                        <Smartphone size={20} /> MODUE FULLSCREEN / KIOSCO
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-8 h-[calc(100vh-280px)]">
@@ -581,6 +686,80 @@ const Sales = ({ isKiosk = false }) => {
                             CONFIRMAR PAGO
                         </button>
                         <button onClick={() => setShowTransferInfo(null)} className="w-full text-center text-gray-400 font-bold hover:text-gray-600 transition-colors uppercase text-[10px] tracking-widest">Cerrar</button>
+                    </div>
+                </div>
+            )}
+
+            {showEditPaymentModal && (
+                <div className="fixed inset-0 z-100 bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[40px] shadow-2xl max-w-md w-full p-8 space-y-6 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-black text-gray-800 tracking-tight">Editar Pago</h2>
+                            <button onClick={() => { setShowEditPaymentModal(false); setCurrentEditSale(null); setSearchTicket(''); }} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {!currentEditSale ? (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-500 font-bold">Ingresa el número de ticket para buscar la venta</p>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Ej: 250202-1234"
+                                        value={searchTicket}
+                                        onChange={e => setSearchTicket(e.target.value)}
+                                        onKeyPress={e => e.key === 'Enter' && loadSaleForEdit(searchTicket)}
+                                    />
+                                    <button
+                                        onClick={() => loadSaleForEdit(searchTicket)}
+                                        disabled={isLoadingSale}
+                                        className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition-all disabled:opacity-50"
+                                    >
+                                        {isLoadingSale ? 'Buscando...' : 'Buscar'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-200">
+                                    <p className="text-xs font-black text-blue-600 uppercase mb-1">Ticket</p>
+                                    <p className="text-lg font-black text-gray-800">{currentEditSale.ticket_number}</p>
+                                    <p className="text-xs text-gray-500 font-bold mt-2">Total: ${parseFloat(currentEditSale.total_amount).toFixed(2)}</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <p className="text-xs font-black text-gray-600 uppercase">Métodos de Pago</p>
+                                    <PayRow label="Efectivo" icon={<DollarSign size={16} />} val={editPaymentMethods.efectivo} set={v => setEditPaymentMethods(p => ({ ...p, efectivo: parseFloat(v) || 0 }))} onFill={() => setEditPaymentMethods(p => ({ ...p, efectivo: parseFloat(currentEditSale.total_amount) || 0 }))} />
+                                    <PayRow label="Tarjeta Débito" icon={<CreditCard size={16} />} val={editPaymentMethods.debito} set={v => setEditPaymentMethods(p => ({ ...p, debito: parseFloat(v) || 0 }))} onFill={() => setEditPaymentMethods(p => ({ ...p, debito: parseFloat(currentEditSale.total_amount) || 0 }))} />
+                                    <PayRow label="Tarjeta Crédito" icon={<CreditCard size={16} />} val={editPaymentMethods.credito} set={v => setEditPaymentMethods(p => ({ ...p, credito: parseFloat(v) || 0 }))} onFill={() => setEditPaymentMethods(p => ({ ...p, credito: parseFloat(currentEditSale.total_amount) || 0 }))} />
+                                    <PayRow label="Mercado Pago" icon={<Smartphone size={16} />} val={editPaymentMethods.mercadopago} set={v => setEditPaymentMethods(p => ({ ...p, mercadopago: parseFloat(v) || 0 }))} onFill={() => setEditPaymentMethods(p => ({ ...p, mercadopago: parseFloat(currentEditSale.total_amount) || 0 }))} />
+                                    <PayRow label="Transferencia" icon={<ArrowRight size={16} />} val={editPaymentMethods.transferencia} set={v => setEditPaymentMethods(p => ({ ...p, transferencia: parseFloat(v) || 0 }))} onFill={() => setEditPaymentMethods(p => ({ ...p, transferencia: parseFloat(currentEditSale.total_amount) || 0 }))} />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase">Nota</p>
+                                    <input type="text" className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500" value={editPaymentNote} onChange={e => setEditPaymentNote(e.target.value)} />
+                                </div>
+
+                                <div className="pt-4 space-y-3">
+                                    <button 
+                                        onClick={updateSalePayment}
+                                        disabled={isProcessing}
+                                        className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all disabled:opacity-50"
+                                    >
+                                        {isProcessing ? 'Actualizando...' : 'ACTUALIZAR Y IMPRIMIR'}
+                                    </button>
+                                    <button 
+                                        onClick={() => { setCurrentEditSale(null); setSearchTicket(''); }}
+                                        className="w-full py-3 bg-gray-100 text-gray-700 rounded-2xl font-black hover:bg-gray-200 transition-all"
+                                    >
+                                        Volver a buscar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

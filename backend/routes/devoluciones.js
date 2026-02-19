@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
 
 // Buscar ventas por número de ticket o DNI para devolución
-router.get('/buscar-venta', authenticateToken, async (req, res) => {
+router.get('/buscar-venta', authenticateToken, isAdmin, async (req, res) => {
     let connection;
     try {
         const { query } = req.query;
@@ -58,7 +58,7 @@ router.get('/buscar-venta', authenticateToken, async (req, res) => {
 });
 
 // Obtener detalles de una venta específica para devolución
-router.get('/venta/:id', authenticateToken, async (req, res) => {
+router.get('/venta/:id', authenticateToken, isAdmin, async (req, res) => {
     let connection;
     try {
         const ventaId = req.params.id;
@@ -112,7 +112,7 @@ router.get('/venta/:id', authenticateToken, async (req, res) => {
 });
 
 // Procesar una devolución
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, isAdmin, async (req, res) => {
     const connection = await db.getConnection();
 
     try {
@@ -243,7 +243,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Obtener historial de devoluciones
-router.get('/historial', authenticateToken, async (req, res) => {
+router.get('/historial', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { page = 1, limit = 10, fechaInicio, fechaFin } = req.query;
         const offset = (page - 1) * limit;

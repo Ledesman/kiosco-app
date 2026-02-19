@@ -29,7 +29,7 @@ const Layout = ({ children }) => {
     const menuItems = [
         { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
         { path: '/sales', icon: <ShoppingCart size={20} />, label: 'Ventas (POS)' },
-        { path: '/devoluciones', icon: <ArrowLeft size={20} />, label: 'Devoluciones' },
+        ...(user?.role === 'admin' ? [{ path: '/devoluciones', icon: <ArrowLeft size={20} />, label: 'Devoluciones' }] : []),
         { path: '/products', icon: <Package size={20} />, label: 'Productos' },
         { path: '/categories', icon: <Tags size={20} />, label: 'Categorías' },
         { path: '/expenses', icon: <TrendingDown size={20} />, label: 'Gastos' },

@@ -22,6 +22,13 @@
 - `GET /sales`: List all sales.
 - `POST /sales`: Register a new sale.
 - `GET /sales/:id`: Get sale details (including items).
+- `PATCH /sales/:id/payment`: Update payment methods for an existing sale.
+  - **Body**: `{ payment_methods: {...}, payment_note: string, reason?: string }`
+  - **Response**: `{ sale: {...}, message: string }`
+  - **Notes**: Creates audit record in `sale_payment_changes` table.
+- `GET /sales/:id/payment-history`: Get payment change history for a sale.
+  - **Response**: `{ payment_changes: [...] }`
+- `GET /sales/ticket/:ticketNumber`: Get sale by ticket number.
 
 ## Promotions
 - `GET /promotions`: List all active promotions.

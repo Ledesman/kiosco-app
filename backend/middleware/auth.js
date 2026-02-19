@@ -22,6 +22,7 @@ const authenticateToken = (req, res, next) => {
 // Check if user is admin
 const isAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
+        console.warn(`Intento de acceso no autorizado a recurso protegido por usuario ${req.user.username} (rol: ${req.user.role})`);
         return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
     }
     next();

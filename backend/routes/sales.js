@@ -288,4 +288,97 @@ router.get('/ticket/:ticketNumber', authenticateToken, async (req, res) => {
     }
 });
 
+// Update sale payment methods
+router.patch('/:id/payment', authenticateToken, async (req, res) => {
+    const connection = await db.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const saleId = req.params.id;
+        const { payment_methods, payment_note } = req.body;
+
+        // 1) Get current sale
+        const [sales] = await connection.query(
+            'SELECT * FROM sales WHERE id = ?',
+            [saleId]
+        );
+
+        if (sales.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Venta no encontrada' });
+        }
+
+        const sale = sales[0];
+
+        // 2) Validate payment total matches sale total
+        const payment_total =
+            (parseFloat(payment_methods.efectivo) || 0) +
+            (parseFloat(payment_methods.debito) || 0) +
+            (parseFloat(payment_methods.credito) || 0) +
+            (parseFloat(payment_methods.transferencia) || 0) +
+            (parseFloat(payment_methods.mercadopago) || 0) +
+            (parseFloat(payment_methods.mp_transferencia) || 0);
+
+        if (Math.abs(payment_total - sale.total_amount) > 0.01) {
+            await connection.rollback();
+            throw new Error('El total de pagos no coincide con el total de la venta');
+        }
+
+        // 3) Update sale with new payment methods and note
+        await connection.query(
+            `UPDATE sales SET
+             payment_method_efectivo = ?,
+             payment_method_debito = ?,
+             payment_method_credito = ?,
+             payment_method_transferencia = ?,
+             payment_method_mercadopago = ?,
+             payment_note = ?
+             WHERE id = ?`,
+            [
+                parseFloat(payment_methods.efectivo) || 0,
+                parseFloat(payment_methods.debito) || 0,
+                parseFloat(payment_methods.credito) || 0,
+                parseFloat(payment_methods.transferencia) || 0,
+                parseFloat(payment_methods.mercadopago) || 0,
+                payment_note || null,
+                saleId
+            ]
+        );
+
+        await connection.commit();
+
+        // 4) Fetch and return updated sale
+        const [updatedSales] = await connection.query(
+            'SELECT * FROM sales WHERE id = ?',
+            [saleId]
+        );
+
+        const updatedSale = updatedSales[0];
+        const responsePaymentMethods = {
+            efectivo: parseFloat(updatedSale.payment_method_efectivo) || 0,
+            debito: parseFloat(updatedSale.payment_method_debito) || 0,
+            credito: parseFloat(updatedSale.payment_method_credito) || 0,
+            transferencia: parseFloat(updatedSale.payment_method_transferencia) || 0,
+            mercadopago: parseFloat(updatedSale.payment_method_mercadopago) || 0,
+            mp_transferencia: 0
+        };
+
+        res.json({
+            sale: {
+                ...updatedSale,
+                payment_methods: responsePaymentMethods
+            },
+            message: 'Método de pago actualizado correctamente'
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Update sale payment error:', error);
+        res.status(500).json({ error: error.message || 'Error en el servidor' });
+    } finally {
+        connection.release();
+    }
+});
+
 module.exports = router;
